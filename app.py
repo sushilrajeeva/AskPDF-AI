@@ -1,3 +1,9 @@
+# Install and import streamlit to create UI
+# Install and import pypdf2 to read our pdf
+# Install and import langchain to intereact with our LLM
+# Install and import faiss-cpu as our vector store
+# Install and import openai and huggingface_hub to create create LLMs
+
 import streamlit as st
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
@@ -14,6 +20,9 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.output_parsers import StrOutputParser
 from langchain.schema import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
+
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 
 from htmlTemplates import css, bot_template, user_template
 
@@ -53,19 +62,25 @@ def get_conversation_chain(vectorStore):
     
     retriever = vectorStore.as_retriever()
     
-    template = """Answer the following question based only on the provided context:
+    system_template = """You are a helpful AI assistant. Use the following pieces of context to answer the human's question. If you don't know the answer, just say that you don't know, don't try to make up an answer.
 
-    Context: {context}
-
-    Question: {question}
-
-    If you don't know the answer based on the context, just say "I don't have enough information to answer that."
-    """
+    Context: {context}"""
     
-    prompt = ChatPromptTemplate.from_template(template)
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", system_template),
+        MessagesPlaceholder(variable_name="chat_history"),
+        ("human", "{question}")
+    ])
+    
+    def format_docs(docs):
+        return "\n\n".join(doc.page_content for doc in docs)
     
     chain = (
-        {"context": retriever, "question": RunnablePassthrough()} 
+        {
+            "context": lambda x: format_docs(retriever.get_relevant_documents(x["question"])),
+            "chat_history": lambda x: x["chat_history"],
+            "question": lambda x: x["question"]
+        }
         | prompt 
         | llm 
         | StrOutputParser()
@@ -75,9 +90,17 @@ def get_conversation_chain(vectorStore):
 
 def handle_userinput(user_question):
     if st.session_state.conversation:
-        response = st.session_state.conversation.invoke(user_question)
-        # Append user question and bot response to chat history
-        st.session_state.chat_history.append((user_question, response))
+        chat_history = st.session_state.chat_history
+        
+        response = st.session_state.conversation.invoke({
+            "question": user_question, 
+            "chat_history": chat_history
+        })
+        
+        st.session_state.chat_history.extend([
+            HumanMessage(content=user_question),
+            AIMessage(content=response)
+        ])
     else:
         st.warning("Please upload and process PDF documents before asking questions.")
 
@@ -88,10 +111,12 @@ def main():
 
     st.write(css, unsafe_allow_html=True)
 
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+
     if "conversation" not in st.session_state:
         st.session_state.conversation = None
         st.session_state.retriever = None
-        st.session_state.chat_history = []  # Initialize chat history
 
     st.header("Chat with Multiple PDFs! :books:")
     user_question = st.text_input("Ask a Question about your documents:")
@@ -100,9 +125,12 @@ def main():
         handle_userinput(user_question)
 
     # Display chat history
-    for user_msg, bot_msg in st.session_state.chat_history:
-        st.write(user_template.replace("{{MSG}}", user_msg), unsafe_allow_html=True)
-        st.write(bot_template.replace("{{MSG}}", bot_msg), unsafe_allow_html=True)
+    for message in st.session_state.chat_history:
+        if isinstance(message, HumanMessage):
+            st.write(user_template.replace("{{MSG}}", message.content), unsafe_allow_html=True)
+        elif isinstance(message, AIMessage):
+            st.write(bot_template.replace("{{MSG}}", message.content), unsafe_allow_html=True)
+
 
     with st.sidebar:
         st.subheader("Your Documents")
