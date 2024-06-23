@@ -8,6 +8,10 @@ import streamlit as st
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
 from langchain.text_splitter import CharacterTextSplitter
+from langchain_openai import OpenAIEmbeddings
+from langchain_community.embeddings import HuggingFaceInstructEmbeddings
+from langchain_community.vectorstores import FAISS
+from sentence_transformers import SentenceTransformer
 
 def get_pdf_text(pdf_docs):
     # This funciton takes pdf document lists and return a single string of text with all of the text content of the pdf
@@ -43,6 +47,16 @@ def get_text_chunks(raw_text):
 
     return chunks
 
+def get_vectorstore(text_chunks):
+    embeddings = OpenAIEmbeddings()
+    vetorStore = FAISS.from_texts(texts=text_chunks, embedding=embeddings)
+    return vetorStore
+
+def get_vectorstore_local(text_chunks):
+    embeddings = HuggingFaceInstructEmbeddings(model_name="hkunlp/instructor-xl")
+    vetorStore = FAISS.from_texts(texts=text_chunks, embedding=embeddings)
+    return vetorStore
+
 
 def main():
 
@@ -65,10 +79,17 @@ def main():
 
                 # Get the text chunks (dividing the pdf into multiple small chunks)
                 text_chunks = get_text_chunks(raw_text)
-                st.write(text_chunks)
+                # st.write(text_chunks)
                 
 
                 # Create a vector store to store the embeddings
+                # 1. using open ai embedding model (paid)
+                # creating vector store
+                # vectorStore = get_vectorstore(text_chunks)
+                # print("vectorstore", vectorStore)
+                # 2. using instructor-xl (free)
+                vectorStore_local = get_vectorstore_local(text_chunks)
+                print("vectorstore", vectorStore_local)
 
 if __name__ == '__main__':
     main()
