@@ -7,6 +7,7 @@
 import streamlit as st
 from dotenv import load_dotenv
 from PyPDF2 import PdfReader
+from langchain.text_splitter import CharacterTextSplitter
 
 def get_pdf_text(pdf_docs):
     # This funciton takes pdf document lists and return a single string of text with all of the text content of the pdf
@@ -18,6 +19,30 @@ def get_pdf_text(pdf_docs):
         for page in pdf_reader.pages:
             text += page.extract_text()
     return text
+
+def get_text_chunks(raw_text):
+    """
+    Takes raw text as input (string) and returns a list of chunks of text that can be fed into a vector database.
+    Uses the CharacterTextSplitter from langchain to divide text into chunks/paragraphs.
+    
+    Args:
+        raw_text (str): The raw text to be split into chunks.
+        
+    Returns:
+        list: A list of text chunks.
+    """
+    text_splitter = CharacterTextSplitter(
+        separator="\n",  # Corrected to use newline character
+        chunk_size=1000,  # Chunk size of 1000 characters
+        chunk_overlap=200,  # Overlap of 200 characters to handle incomplete chunks
+        length_function=len
+    )
+
+    chunks = text_splitter.split_text(raw_text)
+    print(f"Number of chunks created: {len(chunks)}")
+
+    return chunks
+
 
 def main():
 
@@ -36,8 +61,12 @@ def main():
 
                 # Get the pdf text
                 raw_text = get_pdf_text(pdf_docs)
+                # st.write(raw_text)
 
                 # Get the text chunks (dividing the pdf into multiple small chunks)
+                text_chunks = get_text_chunks(raw_text)
+                st.write(text_chunks)
+                
 
                 # Create a vector store to store the embeddings
 
