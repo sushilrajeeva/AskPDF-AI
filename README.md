@@ -21,7 +21,7 @@ The application follows these steps to provide responses to your questions:
 
 ## Output
 ------------
-![AskPDF-AI Conversation](./docs/PDF-LangChain.jpg)
+![AskPDF-AI Conversation](./docs/AskPDF-AI.jpg)
 
 ## Dependencies and Installation
 ----------------------------
